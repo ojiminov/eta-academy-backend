@@ -1,0 +1,221 @@
+import { PrismaClient, Role, UserStatus, EnglishLevel, CourseLevel, CourseStatus, PricingType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('Starting seed...');
+
+  // ─── Admin user ───────────────────────────────────────────────────────────
+  const adminPasswordHash = await bcrypt.hash('Admin123!', 12);
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@eta.academy' },
+    update: {},
+    create: {
+      email: 'admin@eta.academy',
+      passwordHash: adminPasswordHash,
+      firstName: 'Admin',
+      lastName: 'User',
+      role: Role.admin,
+      status: UserStatus.active,
+      emailVerified: true,
+      timezone: 'UTC',
+      locale: 'en',
+    },
+  });
+  console.log(`Created admin user: ${admin.email}`);
+
+  // ─── Teacher user ─────────────────────────────────────────────────────────
+  const teacherPasswordHash = await bcrypt.hash('Teacher123!', 12);
+  const teacherUser = await prisma.user.upsert({
+    where: { email: 'teacher@eta.academy' },
+    update: {},
+    create: {
+      email: 'teacher@eta.academy',
+      passwordHash: teacherPasswordHash,
+      firstName: 'Jane',
+      lastName: 'Smith',
+      role: Role.teacher,
+      status: UserStatus.active,
+      emailVerified: true,
+      timezone: 'America/New_York',
+      locale: 'en',
+    },
+  });
+
+  const teacher = await prisma.teacher.upsert({
+    where: { userId: teacherUser.id },
+    update: {},
+    create: {
+      userId: teacherUser.id,
+      bio: 'Experienced English teacher with over 10 years of teaching IELTS and Business English.',
+      specializations: ['IELTS', 'Business English', 'Conversational English'],
+      qualifications: ['CELTA', 'Delta Module 1', 'MA Applied Linguistics'],
+      isVerified: true,
+    },
+  });
+  console.log(`Created teacher user: ${teacherUser.email}`);
+
+  // ─── Student user ─────────────────────────────────────────────────────────
+  const studentPasswordHash = await bcrypt.hash('Student123!', 12);
+  const studentUser = await prisma.user.upsert({
+    where: { email: 'student@eta.academy' },
+    update: {},
+    create: {
+      email: 'student@eta.academy',
+      passwordHash: studentPasswordHash,
+      firstName: 'John',
+      lastName: 'Doe',
+      role: Role.student,
+      status: UserStatus.active,
+      emailVerified: true,
+      timezone: 'America/Los_Angeles',
+      locale: 'en',
+    },
+  });
+
+  await prisma.student.upsert({
+    where: { userId: studentUser.id },
+    update: {},
+    create: {
+      userId: studentUser.id,
+      englishLevel: EnglishLevel.B1,
+      bio: 'Enthusiastic learner looking to improve my Business English skills.',
+      goals: 'Achieve B2 level and prepare for IELTS exam.',
+      xpPoints: 0,
+      streakDays: 0,
+    },
+  });
+  console.log(`Created student user: ${studentUser.email}`);
+
+  // ─── Categories ───────────────────────────────────────────────────────────
+  const categories = [
+    {
+      name: 'General English',
+      slug: 'general-english',
+      description: 'Comprehensive English courses for all levels covering grammar, vocabulary, reading, writing, and speaking.',
+      sortOrder: 1,
+    },
+    {
+      name: 'Business English',
+      slug: 'business-english',
+      description: 'Professional English communication skills for the workplace, including emails, presentations, and negotiations.',
+      sortOrder: 2,
+    },
+    {
+      name: 'IELTS Preparation',
+      slug: 'ielts-preparation',
+      description: 'Targeted preparation for the IELTS Academic and General Training examinations.',
+      sortOrder: 3,
+    },
+    {
+      name: 'Conversational',
+      slug: 'conversational',
+      description: 'Improve your spoken English fluency and confidence through interactive conversational practice.',
+      sortOrder: 4,
+    },
+  ];
+
+  const createdCategories: Record<string, string> = {};
+  for (const cat of categories) {
+    const created = await prisma.category.upsert({
+      where: { slug: cat.slug },
+      update: {},
+      create: cat,
+    });
+    createdCategories[cat.slug] = created.id;
+    console.log(`Created category: ${created.name}`);
+  }
+
+  // ─── Published course ─────────────────────────────────────────────────────
+  const course = await prisma.course.upsert({
+    where: { slug: 'ielts-band-7-complete-guide' },
+    update: {},
+    create: {
+      teacherId: teacher.id,
+      categoryId: createdCategories['ielts-preparation'],
+      title: 'IELTS Band 7+ Complete Guide',
+      slug: 'ielts-band-7-complete-guide',
+      description:
+        'A comprehensive IELTS preparation course designed to help you achieve Band 7 or above. ' +
+        'This course covers all four skills — Listening, Reading, Writing, and Speaking — with ' +
+        'detailed strategies, practice tests, and expert feedback. By the end of this course, ' +
+        'you will have the confidence and skills to achieve your target score.',
+      shortDescription: 'Achieve IELTS Band 7+ with our comprehensive preparation course covering all four skills.',
+      level: CourseLevel.B2,
+      status: CourseStatus.published,
+      pricingType: PricingType.one_time,
+      price: 99.99,
+      currency: 'USD',
+      durationHours: 40,
+      certificateOnCompletion: true,
+      completionThreshold: 80,
+      publishedAt: new Date(),
+    },
+  });
+  console.log(`Created course: ${course.title}`);
+
+  // ─── Seed a few lessons for the course ───────────────────────────────────
+  const lessons = [
+    {
+      courseId: course.id,
+      title: 'Introduction to IELTS',
+      slug: 'introduction-to-ielts',
+      description: 'Overview of the IELTS exam format, scoring system, and what to expect on test day.',
+      contentType: 'video' as const,
+      videoUrl: 'https://example.com/videos/intro-ielts.mp4',
+      durationSeconds: 900,
+      sortOrder: 1,
+      isPreview: true,
+      isPublished: true,
+    },
+    {
+      courseId: course.id,
+      title: 'Listening: Multiple Choice Strategies',
+      slug: 'listening-multiple-choice',
+      description: 'Master the multiple choice questions in the IELTS Listening section.',
+      contentType: 'video' as const,
+      videoUrl: 'https://example.com/videos/listening-mc.mp4',
+      durationSeconds: 1800,
+      sortOrder: 2,
+      isPreview: false,
+      isPublished: true,
+    },
+    {
+      courseId: course.id,
+      title: 'Reading: Skimming and Scanning',
+      slug: 'reading-skimming-scanning',
+      description: 'Learn effective skimming and scanning techniques to tackle the IELTS Reading section efficiently.',
+      contentType: 'mixed' as const,
+      contentHtml: '<h2>Skimming and Scanning</h2><p>These two techniques are fundamental to IELTS Reading success...</p>',
+      durationSeconds: 1500,
+      sortOrder: 3,
+      isPreview: false,
+      isPublished: true,
+    },
+  ];
+
+  for (const lesson of lessons) {
+    await prisma.lesson.upsert({
+      where: {
+        // Use a composite-like approach by checking if a lesson with the same slug exists in the course
+        // Prisma doesn't support compound upsert on non-@@unique fields easily, so we create only
+        id: (await prisma.lesson.findFirst({ where: { courseId: course.id, slug: lesson.slug } }))?.id ?? '00000000-0000-0000-0000-000000000000',
+      },
+      update: {},
+      create: lesson,
+    });
+    console.log(`Created lesson: ${lesson.title}`);
+  }
+
+  console.log('Seed completed successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error('Seed failed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

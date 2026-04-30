@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  student
+  teacher
+  admin
+  billing_manager
+}
+
+enum UserStatus {
+  active
+  suspended
+  pending_verification
+  deleted
+}
+
+enum EnglishLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+  all_levels
+}
+
+enum CourseLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+  all_levels
+}
+
+enum CourseStatus {
+  draft
+  pending_review
+  published
+  archived
+}
+
+enum PricingType {
+  free
+  one_time
+  subscription
+}
+
+enum ContentType {
+  video
+  audio
+  text
+  mixed
+}
+
+enum EnrollmentStatus {
+  active
+  completed
+  refunded
+  suspended
+}
+
+enum SubmissionStatus {
+  submitted
+  graded
+  returned
+  late
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum CertificateStatus {
+  issued
+  revoked
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  avatarUrl           String?
+  role                Role      @default(student)
+  status              UserStatus @default(pending_verification)
+  emailVerified       Boolean   @default(false)
+  verifyToken         String?
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+  lastLoginAt         DateTime?
+  timezone            String    @default("UTC")
+  locale              String    @default("en")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  student       Student?
+  teacher       Teacher?
+  gradedSubmissions Submission[] @relation("GradedBy")
+  issuedCertificates Certificate[] @relation("IssuedBy")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Student {
+  id             String       @id @default(uuid())
+  userId         String       @unique
+  englishLevel   EnglishLevel @default(A1)
+  bio            String?
+  goals          String?
+  xpPoints       Int          @default(0)
+  streakDays     Int          @default(0)
+  lastActivityAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  submissions Submission[]
+  payments    Payment[]
+  certificates Certificate[]
+}
+
+model Teacher {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  bio             String?
+  specializations String[]
+  qualifications  String[]
+  rating          Decimal  @default(0) @db.Decimal(3, 2)
+  ratingCount     Int      @default(0)
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses Course[]
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses Course[]
+}
+
+model Course {
+  id                      String       @id @default(uuid())
+  teacherId               String
+  categoryId              String?
+  title                   String
+  slug                    String       @unique
+  description             String
+  shortDescription        String?
+  thumbnailUrl            String?
+  level                   CourseLevel  @default(all_levels)
+  status                  CourseStatus @default(draft)
+  pricingType             PricingType  @default(one_time)
+  price                   Decimal      @default(0) @db.Decimal(10, 2)
+  currency                String       @default("USD")
+  durationHours           Decimal?     @db.Decimal(6, 2)
+  certificateOnCompletion Boolean      @default(true)
+  completionThreshold     Int          @default(80)
+  ratingAvg               Decimal      @default(0) @db.Decimal(3, 2)
+  ratingCount             Int          @default(0)
+  enrollmentCount         Int          @default(0)
+  publishedAt             DateTime?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lessons     Lesson[]
+  assignments Assignment[]
+  enrollments Enrollment[]
+  payments    Payment[]
+  certificates Certificate[]
+}
+
+model Lesson {
+  id             String      @id @default(uuid())
+  courseId       String
+  title          String
+  slug           String
+  description    String?
+  contentType    ContentType @default(text)
+  videoUrl       String?
+  audioUrl       String?
+  contentHtml    String?
+  durationSeconds Int?
+  sortOrder      Int         @default(0)
+  isPreview      Boolean     @default(false)
+  isPublished    Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignments Assignment[]
+  progress    Progress[]
+
+  @@index([courseId])
+}
+
+model Assignment {
+  id             String  @id @default(uuid())
+  courseId       String
+  lessonId       String?
+  title          String
+  instructions   String
+  rubric         String?
+  submissionType String  @default("text")
+  maxScore       Int     @default(100)
+  passingScore   Int     @default(60)
+  dueDays        Int?
+  isRequired     Boolean @default(false)
+  sortOrder      Int     @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson      Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  submissions Submission[]
+
+  @@index([courseId])
+}
+
+model Enrollment {
+  id             String           @id @default(uuid())
+  studentId      String
+  courseId       String
+  status         EnrollmentStatus @default(active)
+  enrolledAt     DateTime         @default(now())
+  completedAt    DateTime?
+  progressPct    Decimal          @default(0) @db.Decimal(5, 2)
+  lastAccessedAt DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  progress     Progress[]
+  submissions  Submission[]
+  payments     Payment[]
+  certificates Certificate[]
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model Progress {
+  id           String    @id @default(uuid())
+  enrollmentId String
+  lessonId     String
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+  watchSeconds Int       @default(0)
+  lastPosition Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId])
+}
+
+model Submission {
+  id           String           @id @default(uuid())
+  assignmentId String
+  enrollmentId String
+  studentId    String
+  status       SubmissionStatus @default(submitted)
+  contentText  String?
+  fileUrl      String?
+  fileName     String?
+  score        Int?
+  grade        String?
+  feedback     String?
+  gradedById   String?
+  gradedAt     DateTime?
+  submittedAt  DateTime         @default(now())
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  gradedBy   User?      @relation("GradedBy", fields: [gradedById], references: [id], onDelete: SetNull)
+
+  @@index([assignmentId])
+  @@index([enrollmentId])
+  @@index([studentId])
+}
+
+model Payment {
+  id                     String        @id @default(uuid())
+  enrollmentId           String?
+  studentId              String
+  courseId               String
+  stripePaymentIntentId  String?       @unique
+  amount                 Decimal       @db.Decimal(10, 2)
+  currency               String        @default("USD")
+  status                 PaymentStatus @default(pending)
+  discountAmount         Decimal       @default(0) @db.Decimal(10, 2)
+  refundAmount           Decimal       @default(0) @db.Decimal(10, 2)
+  refundedAt             DateTime?
+  invoicePdfUrl          String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  student    Student     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model Certificate {
+  id                String            @id @default(uuid())
+  studentId         String
+  courseId          String
+  enrollmentId      String
+  certificateNumber String            @unique
+  status            CertificateStatus @default(issued)
+  pdfUrl            String?
+  verificationUrl   String?
+  issuedById        String?
+  issuedAt          DateTime          @default(now())
+  revokedAt         DateTime?
+  revokeReason      String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  issuedBy   User?      @relation("IssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
