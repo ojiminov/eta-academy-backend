@@ -4,9 +4,13 @@ import { config } from './config/env';
 
 async function startServer(): Promise<void> {
   try {
-    // Verify database connectivity on startup
-    await prisma.$queryRaw`SELECT 1`;
-    console.log('Database connected successfully.');
+    // Attempt DB ping but don't crash if it fails — connection is lazy
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('Database connected successfully.');
+    } catch (dbError) {
+      console.warn('Database ping failed on startup — will retry on first request:', dbError);
+    }
 
     const port = config.port;
 
