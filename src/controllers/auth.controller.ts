@@ -62,7 +62,7 @@ export class AuthController {
       if (assignedRole === Role.student) {
         await prisma.student.create({ data: { userId: user.id } });
       } else if (assignedRole === Role.teacher) {
-        await prisma.teacher.create({ data: { userId: user.id, specializations: [], qualifications: [] } });
+        await prisma.teacher.create({ data: { userId: user.id, subjects: [], qualifications: [] } });
       }
 
       // Send verification email (non-blocking on failure)

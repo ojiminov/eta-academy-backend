@@ -1,46 +1,40 @@
-import { Router, Request, Response } from 'express';
-import authRoutes from './auth.routes';
+import { Router } from 'express';
+
+import authRoutes         from './auth.routes';
+import usersRoutes        from './users.routes';
+import studentsRoutes     from './students.routes';
+import teachersRoutes     from './teachers.routes';
+import subjectsRoutes     from './subjects.routes';
+import groupsRoutes       from './groups.routes';
+import sessionsRoutes     from './sessions.routes';
+import gradesRoutes       from './grades.routes';
+import paymentsRoutes     from './payments.routes';
+import announcementsRoutes from './announcements.routes';
+import dashboardRoutes    from './dashboard.routes';
 
 const router = Router();
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-router.use('/auth', authRoutes);
+// ─── Public / Auth ────────────────────────────────────────────────────────────
+router.use('/auth',          authRoutes);
 
-// ─── Stub routes — coming soon ────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+router.use('/dashboard',     dashboardRoutes);
 
-router.use('/students', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'Students API — coming soon.',
-  });
-});
+// ─── Users & Profiles ─────────────────────────────────────────────────────────
+router.use('/users',         usersRoutes);
+router.use('/students',      studentsRoutes);
+router.use('/teachers',      teachersRoutes);
 
-router.use('/courses', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'Courses API — coming soon.',
-  });
-});
+// ─── Academic Structure ───────────────────────────────────────────────────────
+router.use('/subjects',      subjectsRoutes);
+router.use('/groups',        groupsRoutes);
 
-router.use('/enrollments', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'Enrollments API — coming soon.',
-  });
-});
+// ─── Sessions, Grades, Payments ───────────────────────────────────────────────
+router.use('/sessions',      sessionsRoutes);
+router.use('/grades',        gradesRoutes);
+router.use('/payments',      paymentsRoutes);
 
-router.use('/payments', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'Payments API — coming soon.',
-  });
-});
-
-router.use('/certificates', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'Certificates API — coming soon.',
-  });
-});
+// ─── Communication ────────────────────────────────────────────────────────────
+router.use('/announcements', announcementsRoutes);
 
 export default router;
