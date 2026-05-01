@@ -11,6 +11,10 @@ import { globalErrorHandler } from './middleware/error.middleware';
 
 const app = express();
 
+// ─── Trust Railway / proxy X-Forwarded-For headers ───────────────────────────
+// Required so express-rate-limit identifies IPs correctly behind Railway's LB
+app.set('trust proxy', 1);
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet());
 
